@@ -102,10 +102,11 @@ type xClient struct {
 	servicePath  string
 	option       Option
 
-	mu        sync.RWMutex
-	servers   map[string]string
-	discovery ServiceDiscovery
-	selector  Selector
+	mu              sync.RWMutex
+	servers         map[string]string
+	unstableServers map[string]time.Time // 一些服务器重启，如果和它们建立链接，可能会耗费非常长的时间，这里记录袭来需要临时屏蔽
+	discovery       ServiceDiscovery
+	selector        Selector
 
 	slGroup singleflight.Group
 
@@ -124,12 +125,13 @@ type xClient struct {
 // NewXClient creates a XClient that supports service discovery and service governance.
 func NewXClient(servicePath string, failMode FailMode, selectMode SelectMode, discovery ServiceDiscovery, option Option) XClient {
 	client := &xClient{
-		failMode:     failMode,
-		selectMode:   selectMode,
-		discovery:    discovery,
-		servicePath:  servicePath,
-		cachedClient: make(map[string]RPCClient),
-		option:       option,
+		failMode:        failMode,
+		selectMode:      selectMode,
+		discovery:       discovery,
+		servicePath:     servicePath,
+		cachedClient:    make(map[string]RPCClient),
+		unstableServers: make(map[string]time.Time),
+		option:          option,
 	}
 
 	pairs := discovery.GetServices()
@@ -167,6 +169,7 @@ func NewBidirectionalXClient(servicePath string, failMode FailMode, selectMode S
 		servicePath:       servicePath,
 		cachedClient:      make(map[string]RPCClient),
 		option:            option,
+		unstableServers:   make(map[string]time.Time),
 		serverMessageChan: serverMessageChan,
 	}
 
@@ -260,10 +263,19 @@ func (c *xClient) selectClient(ctx context.Context, servicePath, serviceMethod s
 	}
 	k := fn(ctx, servicePath, serviceMethod, args)
 	c.mu.Unlock()
+
 	if k == "" {
 		return "", nil, ErrXClientNoServer
 	}
+
 	client, err := c.getCachedClient(k, servicePath, serviceMethod, args)
+
+	// if err != nil {
+	// 	c.mu.Lock()
+	// 	c.unstableServers[k] = time.Now() // 此服务器有问题，暂时屏蔽
+	// 	c.mu.Unlock()
+	// }
+
 	return k, client, err
 }
 
@@ -301,11 +313,9 @@ func (c *xClient) getCachedClient(k string, servicePath, serviceMethod string, a
 	c.mu.Unlock()
 
 	if client == nil || client.IsShutdown() {
-		c.mu.Lock()
 		generatedClient, err, _ := c.slGroup.Do(k, func() (interface{}, error) {
 			return c.generateClient(k, servicePath, serviceMethod)
 		})
-		c.mu.Unlock()
 
 		c.slGroup.Forget(k)
 		if err != nil {
@@ -797,7 +807,10 @@ func (c *xClient) wrapCall(ctx context.Context, client RPCClient, serviceMethod 
 		log.Debugf("call a client for %s.%s, args: %+v in case of xclient wrapCall", c.servicePath, serviceMethod, args)
 	}
 
-	ctx = share.NewContext(ctx)
+	if _, ok := ctx.(*share.Context); !ok {
+		ctx = share.NewContext(ctx)
+	}
+
 	c.Plugins.DoPreCall(ctx, c.servicePath, serviceMethod, args)
 	err := client.Call(ctx, c.servicePath, serviceMethod, args, reply)
 	c.Plugins.DoPostCall(ctx, c.servicePath, serviceMethod, args, reply, err)
@@ -849,6 +862,8 @@ func (c *xClient) Broadcast(ctx context.Context, serviceMethod string, args inte
 		m[share.AuthKey] = c.auth
 	}
 
+	var replyOnce sync.Once
+
 	ctx = setServerTimeout(ctx)
 	callPlugins := make([]RPCClient, 0, len(c.servers))
 	clients := make(map[string]RPCClient)
@@ -897,7 +912,9 @@ func (c *xClient) Broadcast(ctx context.Context, serviceMethod string, args inte
 			}
 
 			if e == nil && reply != nil && clonedReply != nil {
-				reflect.ValueOf(reply).Elem().Set(reflect.ValueOf(clonedReply).Elem())
+				replyOnce.Do(func() {
+					reflect.ValueOf(reply).Elem().Set(reflect.ValueOf(clonedReply).Elem())
+				})
 			}
 		}()
 	}
@@ -967,6 +984,8 @@ func (c *xClient) Fork(ctx context.Context, serviceMethod string, args interface
 		return ErrXClientNoServer
 	}
 
+	var replyOnce sync.Once
+
 	err := &ex.MultiError{}
 	l := len(clients)
 	done := make(chan bool, l)
@@ -981,7 +1000,9 @@ func (c *xClient) Fork(ctx context.Context, serviceMethod string, args interface
 
 			e := c.wrapCall(ctx, client, serviceMethod, args, clonedReply)
 			if e == nil && reply != nil && clonedReply != nil {
-				reflect.ValueOf(reply).Elem().Set(reflect.ValueOf(clonedReply).Elem())
+				replyOnce.Do(func() {
+					reflect.ValueOf(reply).Elem().Set(reflect.ValueOf(clonedReply).Elem())
+				})
 			}
 			done <- (e == nil)
 			if e != nil {
@@ -1067,6 +1088,8 @@ func (c *xClient) Inform(ctx context.Context, serviceMethod string, args interfa
 	var receiptsLock sync.Mutex
 	var receipts []Receipt
 
+	var replyOnce sync.Once
+
 	err := &ex.MultiError{}
 	l := len(clients)
 	done := make(chan bool, l)
@@ -1088,7 +1111,9 @@ func (c *xClient) Inform(ctx context.Context, serviceMethod string, args interfa
 				err.Append(e)
 			}
 			if e == nil && reply != nil && clonedReply != nil {
-				reflect.ValueOf(reply).Elem().Set(reflect.ValueOf(clonedReply).Elem())
+				replyOnce.Do(func() {
+					reflect.ValueOf(reply).Elem().Set(reflect.ValueOf(clonedReply).Elem())
+				})
 			}
 
 			addr := k

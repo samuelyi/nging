@@ -3,6 +3,8 @@ package server
 import (
 	"crypto/tls"
 	"time"
+
+	"github.com/alitto/pond"
 )
 
 // OptionFn configures options of server.
@@ -35,5 +37,26 @@ func WithReadTimeout(readTimeout time.Duration) OptionFn {
 func WithWriteTimeout(writeTimeout time.Duration) OptionFn {
 	return func(s *Server) {
 		s.writeTimeout = writeTimeout
+	}
+}
+
+// WithPool sets goroutine pool.
+func WithPool(maxWorkers, maxCapacity int, options ...pond.Option) OptionFn {
+	return func(s *Server) {
+		s.pool = pond.New(maxWorkers, maxCapacity, options...)
+	}
+}
+
+// WithCustomPool uses a custom goroutine pool.
+func WithCustomPool(pool WorkerPool) OptionFn {
+	return func(s *Server) {
+		s.pool = pool
+	}
+}
+
+// WithAsyncWrite sets AsyncWrite to true.
+func WithAsyncWrite() OptionFn {
+	return func(s *Server) {
+		s.AsyncWrite = true
 	}
 }
