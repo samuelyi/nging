@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -10,8 +11,10 @@ import (
 	"strings"
 
 	"github.com/rs/cors"
+	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/protocol"
 	"github.com/smallnest/rpcx/share"
+	"github.com/soheilhy/cmux"
 )
 
 func (s *Server) jsonrpcHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +57,7 @@ func (s *Server) handleJSONRPCRequest(ctx context.Context, r *jsonrpcRequest, he
 	var res = &jsonrpcRespone{}
 	res.ID = r.ID
 
-	req := protocol.GetPooledMsg()
+	req := protocol.NewMessage()
 	if req.Metadata == nil {
 		req.Metadata = make(map[string]string)
 	}
@@ -208,12 +211,11 @@ func AllowAllCORSOptions() *CORSOptions {
 // SetCORS sets CORS options.
 // for example:
 //
-//    cors.Options{
-//    	AllowedOrigins:   []string{"foo.com"},
-//    	AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodDelete},
-//    	AllowCredentials: true,
-//    }
-//
+//	cors.Options{
+//		AllowedOrigins:   []string{"foo.com"},
+//		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodDelete},
+//		AllowCredentials: true,
+//	}
 func (s *Server) SetCORS(options *CORSOptions) {
 	s.corsOptions = options
 }
@@ -231,11 +233,22 @@ func (s *Server) startJSONRPC2(ln net.Listener) {
 		c := cors.New(opt)
 		mux := c.Handler(newServer)
 		srv.Handler = mux
-
-		go srv.Serve(ln)
 	} else {
 		srv.Handler = newServer
-		go srv.Serve(ln)
 	}
 
+	s.jsonrpcHTTPServer = &srv
+	if err := s.jsonrpcHTTPServer.Serve(ln); !errors.Is(err, cmux.ErrServerClosed) {
+		log.Errorf("error in JSONRPC server: %T %s", err, err)
+	}
+}
+
+func (s *Server) closeJSONRPC2(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.jsonrpcHTTPServer != nil {
+		return s.jsonrpcHTTPServer.Shutdown(ctx)
+	}
+
+	return nil
 }

@@ -1,13 +1,15 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 
+	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/util"
-	"github.com/valyala/bytebufferpool"
 )
 
 var bufferPool = util.NewLimitedPool(512, 4096)
@@ -114,7 +116,6 @@ func NewMessage() *Message {
 
 // Header is the first part of Message and has fixed size.
 // Format:
-//
 type Header [12]byte
 
 // CheckMagicNumber checks whether header starts rpcx magic number.
@@ -214,7 +215,7 @@ func (h *Header) SetSeq(seq uint64) {
 // Clone clones from an message.
 func (m Message) Clone() *Message {
 	header := *m.Header
-	c := GetPooledMsg()
+	c := NewMessage()
 	header.SetCompressType(None)
 	c.Header = &header
 	c.ServicePath = m.ServicePath
@@ -230,7 +231,7 @@ func (m Message) Encode() []byte {
 
 // EncodeSlicePointer encodes messages as a byte slice pointer we can use pool to improve.
 func (m Message) EncodeSlicePointer() *[]byte {
-	bb := bytebufferpool.Get()
+	var bb = bytes.NewBuffer(make([]byte, 0, len(m.Metadata)*64))
 	encodeMetadata(m.Metadata, bb)
 	meta := bb.Bytes()
 
@@ -275,8 +276,6 @@ func (m Message) EncodeSlicePointer() *[]byte {
 	binary.BigEndian.PutUint32((*data)[metaStart:metaStart+4], uint32(len(meta)))
 	copy((*data)[metaStart+4:], meta)
 
-	bytebufferpool.Put(bb)
-
 	binary.BigEndian.PutUint32((*data)[payLoadStart:payLoadStart+4], uint32(len(payload)))
 	copy((*data)[payLoadStart+4:], payload)
 
@@ -296,7 +295,7 @@ func (m Message) WriteTo(w io.Writer) (int64, error) {
 		return n, err
 	}
 
-	bb := bytebufferpool.Get()
+	bb := bytes.NewBuffer(make([]byte, 0, len(m.Metadata)*64))
 	encodeMetadata(m.Metadata, bb)
 	meta := bb.Bytes()
 
@@ -349,8 +348,6 @@ func (m Message) WriteTo(w io.Writer) (int64, error) {
 		return n, err
 	}
 
-	bytebufferpool.Put(bb)
-
 	// write payload
 	err = binary.Write(w, binary.BigEndian, uint32(len(payload)))
 	if err != nil {
@@ -362,17 +359,17 @@ func (m Message) WriteTo(w io.Writer) (int64, error) {
 }
 
 // len,string,len,string,......
-func encodeMetadata(m map[string]string, bb *bytebufferpool.ByteBuffer) {
+func encodeMetadata(m map[string]string, bb *bytes.Buffer) {
 	if len(m) == 0 {
 		return
 	}
-	d := poolUint32Data.Get().(*[]byte)
+	d := make([]byte, 4)
 	for k, v := range m {
-		binary.BigEndian.PutUint32(*d, uint32(len(k)))
-		bb.Write(*d)
+		binary.BigEndian.PutUint32(d, uint32(len(k)))
+		bb.Write(d)
 		bb.Write(util.StringToSliceByte(k))
-		binary.BigEndian.PutUint32(*d, uint32(len(v)))
-		bb.Write(*d)
+		binary.BigEndian.PutUint32(d, uint32(len(v)))
+		bb.Write(d)
 		bb.Write(util.StringToSliceByte(v))
 	}
 }
@@ -417,7 +414,14 @@ func Read(r io.Reader) (*Message, error) {
 
 // Decode decodes a message from reader.
 func (m *Message) Decode(r io.Reader) error {
-	// validate rest length for each step?
+	defer func() {
+		if err := recover(); err != nil {
+			var errStack = make([]byte, 1024)
+			n := runtime.Stack(errStack, true)
+			log.Errorf("panic in message decode: %v, stack: %s", err, errStack[:n])
+
+		}
+	}()
 
 	// parse header
 	_, err := io.ReadFull(r, m.Header[:1])
@@ -434,14 +438,12 @@ func (m *Message) Decode(r io.Reader) error {
 	}
 
 	// total
-	lenData := poolUint32Data.Get().(*[]byte)
-	_, err = io.ReadFull(r, *lenData)
+	lenData := make([]byte, 4)
+	_, err = io.ReadFull(r, lenData)
 	if err != nil {
-		poolUint32Data.Put(lenData)
 		return err
 	}
-	l := binary.BigEndian.Uint32(*lenData)
-	poolUint32Data.Put(lenData)
+	l := binary.BigEndian.Uint32(lenData)
 
 	if MaxMessageLength > 0 && int(l) > MaxMessageLength {
 		return ErrMessageTooLong
