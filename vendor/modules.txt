@@ -558,8 +558,8 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dsoprea/go-logging v0.0.0-20200710184922-b02d349568dd
 ## explicit; go 1.13
 github.com/dsoprea/go-logging
-# github.com/dustin/go-humanize v1.0.0
-## explicit
+# github.com/dustin/go-humanize v1.0.1
+## explicit; go 1.16
 github.com/dustin/go-humanize
 # github.com/edwingeng/doublejump v1.0.0
 ## explicit; go 1.13
@@ -822,8 +822,8 @@ github.com/kavu/go_reuseport
 ## explicit; go 1.14
 github.com/kisielk/errcheck
 github.com/kisielk/errcheck/errcheck
-# github.com/klauspost/compress v1.15.7
-## explicit; go 1.16
+# github.com/klauspost/compress v1.15.15
+## explicit; go 1.17
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
@@ -838,7 +838,7 @@ github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid v1.3.1
 ## explicit; go 1.12
 github.com/klauspost/cpuid
-# github.com/klauspost/cpuid/v2 v2.0.14
+# github.com/klauspost/cpuid/v2 v2.2.3
 ## explicit; go 1.15
 github.com/klauspost/cpuid/v2
 # github.com/klauspost/pgzip v1.2.5
@@ -951,7 +951,7 @@ github.com/miekg/dns
 # github.com/minio/md5-simd v1.1.2
 ## explicit; go 1.14
 github.com/minio/md5-simd
-# github.com/minio/minio-go/v7 v7.0.31
+# github.com/minio/minio-go/v7 v7.0.49
 ## explicit; go 1.17
 github.com/minio/minio-go/v7
 github.com/minio/minio-go/v7/pkg/credentials
@@ -1224,7 +1224,7 @@ github.com/shirou/gopsutil/v3/load
 github.com/shirou/gopsutil/v3/mem
 github.com/shirou/gopsutil/v3/net
 github.com/shirou/gopsutil/v3/process
-# github.com/sirupsen/logrus v1.8.1
+# github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/smallnest/quick v0.0.0-20220703133648-f13409fa6c67
@@ -1489,7 +1489,7 @@ gocloud.dev/internal/retry
 ## explicit; go 1.12
 goftp.io/server/v2
 goftp.io/server/v2/ratelimit
-# golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
+# golang.org/x/crypto v0.6.0
 ## explicit; go 1.17
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
@@ -1506,8 +1506,8 @@ golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/hkdf
+golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
-golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/salsa20
@@ -1541,7 +1541,7 @@ golang.org/x/lint/golint
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20220708220712-1185a9018129
+# golang.org/x/net v0.7.0
 ## explicit; go 1.17
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1571,12 +1571,12 @@ golang.org/x/net/websocket
 golang.org/x/oauth2
 golang.org/x/oauth2/clientcredentials
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+# golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20220708085239-5a0f0661e09d
+# golang.org/x/sys v0.5.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -1587,7 +1587,7 @@ golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/eventlog
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/text v0.3.7
+# golang.org/x/text v0.7.0
 ## explicit; go 1.17
 golang.org/x/text/collate
 golang.org/x/text/encoding
@@ -1614,14 +1614,15 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.1.11
-## explicit; go 1.17
+# golang.org/x/tools v0.1.12
+## explicit; go 1.18
 golang.org/x/tools/go/analysis
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/gcimporter
 golang.org/x/tools/go/internal/packagesdriver
+golang.org/x/tools/go/internal/pkgbits
 golang.org/x/tools/go/packages
 golang.org/x/tools/imports
 golang.org/x/tools/internal/analysisinternal
@@ -1633,7 +1634,6 @@ golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gocommand
 golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/imports
-golang.org/x/tools/internal/lsp/fuzzy
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
@@ -1743,7 +1743,7 @@ google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
-# gopkg.in/ini.v1 v1.66.6
+# gopkg.in/ini.v1 v1.67.0
 ## explicit
 gopkg.in/ini.v1
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
